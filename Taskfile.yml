@@ -1,0 +1,52 @@
+# Thin wrapper over docker compose. Nothing here runs on the host except docker.
+version: '3'
+
+vars:
+  COMPOSE: docker compose
+  PROFILES: --profile servers --profile tools
+
+tasks:
+  default:
+    cmds:
+      - task --list
+    silent: true
+
+  build:
+    desc: Build every image
+    cmds:
+      - '{{.COMPOSE}} {{.PROFILES}} build'
+
+  # task bench SCENARIO=echo-throughput -- --servers go,rust --runs 3
+  bench:
+    desc: Run a scenario (SCENARIO=<name>, extra runner args after --)
+    vars:
+      SCENARIO: '{{.SCENARIO | default "smoke"}}'
+    cmds:
+      - '{{.COMPOSE}} run --rm runner run --scenario /scenarios/{{.SCENARIO}}.json {{.CLI_ARGS}}'
+
+  smoke:
+    desc: Run the smoke scenario
+    cmds:
+      - task: bench
+        vars: { SCENARIO: smoke }
+
+  # task report SESSION=results/echo-throughput-20261002-120000
+  report:
+    desc: Rebuild the summary of a session (SESSION=results/<session>)
+    requires:
+      vars: [SESSION]
+    cmds:
+      - '{{.COMPOSE}} run --rm runner report /results/{{base .SESSION}}'
+
+  config:
+    desc: Print the resolved compose config
+    cmds:
+      - '{{.COMPOSE}} {{.PROFILES}} config'
+
+  # Removes containers an interrupted run may have left behind.
+  clean:
+    desc: Remove leftover benchmark containers
+    cmds:
+      - cmd: docker rm -f $(docker ps -aq --filter label=org.wsbench.managed=true) 2>/dev/null
+        ignore_error: true
+      - '{{.COMPOSE}} {{.PROFILES}} down --remove-orphans'

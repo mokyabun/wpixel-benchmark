@@ -1,0 +1,61 @@
+name: wsbench
+
+x-server: &server
+  network_mode: host
+  cpuset: "${SERVER_CPUSET:-2}"
+  ulimits:
+    nofile: 1048576
+  environment:
+    CORES: "${CORES:-1}"
+    PORT: "${PORT:-8080}"
+  profiles: [servers]
+  restart: "no"
+
+services:
+  node:
+    <<: *server
+    build: servers/node
+    image: wsbench/node:latest
+
+  bun:
+    <<: *server
+    build: servers/bun
+    image: wsbench/bun:latest
+
+  go:
+    <<: *server
+    build: servers/go
+    image: wsbench/go:latest
+
+  rust:
+    <<: *server
+    build: servers/rust
+    image: wsbench/rust:latest
+
+  loader:
+    build: loader
+    image: wsbench/loader:latest
+    network_mode: host
+    cpuset: "${LOADER_CPUS:-0,1}"
+    security_opt: [apparmor=unconfined]   # same as the runner's loader
+    ulimits:
+      nofile: 1048576
+    command: ["-url", "ws://127.0.0.1:${PORT:-8080}/ws", "-connections", "100", "-warmup", "3s", "-duration", "10s"]
+    profiles: [tools]
+
+  runner:
+    build: runner
+    image: wsbench/runner:latest
+    network_mode: host
+    cpuset: "${RUNNER_CPUS:-0}"
+    environment:
+      SERVER_CPUS: "${SERVER_CPUS:-2,3}"
+      LOADER_CPUS: "${LOADER_CPUS:-0,1}"
+      PORT: "${PORT:-8080}"
+      RESULTS_DIR: /results
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./scenarios:/scenarios:ro
+      - ./results:/results
+    command: ["run", "--scenario", "/scenarios/smoke.json"]
+    profiles: [tools]

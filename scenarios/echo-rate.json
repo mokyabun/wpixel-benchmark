@@ -1,0 +1,12 @@
+{
+  "name": "echo-rate",
+  "mode": "rate",
+  "servers": ["node", "bun", "go", "rust"],
+  "cores": [1, 2],
+  "connections": [1000],
+  "payload": [64],
+  "rates": [10000, 25000, 50000, 75000, 100000],
+  "warmup": 15,
+  "duration": 30,
+  "runs": 5
+}

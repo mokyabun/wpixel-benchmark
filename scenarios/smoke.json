@@ -1,0 +1,13 @@
+{
+  "name": "smoke",
+  "mode": "throughput",
+  "servers": ["node", "bun", "go", "rust"],
+  "cores": [1, 2],
+  "connections": [100],
+  "payload": [64],
+  "warmup": 3,
+  "duration": 5,
+  "stabilize": 1,
+  "cooldown": 1,
+  "runs": 1
+}

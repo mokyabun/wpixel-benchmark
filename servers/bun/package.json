@@ -1,0 +1,5 @@
+{
+  "name": "wsbench-bun",
+  "private": true,
+  "module": "server.ts"
+}

@@ -1,0 +1,16 @@
+{
+  "name": "room-smoke",
+  "mode": "room",
+  "servers": ["node", "bun", "go", "rust"],
+  "cores": [1, 2],
+  "connections": [1000, 5000],
+  "payload": [64],
+  "room_size": 20,
+  "user_rate": 0.2,
+  "slo_p99_ms": 100,
+  "warmup": 3,
+  "duration": 5,
+  "stabilize": 1,
+  "cooldown": 2,
+  "runs": 1
+}

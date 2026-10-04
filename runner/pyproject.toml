@@ -1,0 +1,13 @@
+[project]
+name = "wsbench"
+version = "0.1.0"
+description = "Benchmark runner: starts one server and the loader per round, measures, merges results."
+requires-python = ">=3.13"
+dependencies = ["docker>=7.1"]
+
+[project.scripts]
+wsbench = "wsbench.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.12.17,<0.13.0"]
+build-backend = "uv_build"

@@ -1,0 +1,11 @@
+{
+  "name": "idle",
+  "mode": "idle",
+  "servers": ["node", "bun", "go", "rust"],
+  "cores": [1],
+  "connections": [1000, 5000, 10000],
+  "warmup": 5,
+  "duration": 30,
+  "cooldown": 10,
+  "runs": 5
+}

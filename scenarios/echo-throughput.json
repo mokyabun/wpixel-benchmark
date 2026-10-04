@@ -1,0 +1,12 @@
+{
+  "name": "echo-throughput",
+  "mode": "throughput",
+  "servers": ["node", "bun", "go", "rust"],
+  "cores": [1, 2],
+  "connections": [100, 1000],
+  "payload": [64, 1024, 16384],
+  "pipeline": 1,
+  "warmup": 15,
+  "duration": 30,
+  "runs": 5
+}

@@ -1,0 +1,370 @@
+<!doctype html>
+<!-- Session report template. page.py replaces the DATA placeholder below with
+     {session, meta, rows}, rows being summary.json. -->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WebSocket Benchmark Report</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.10);
+  --s1: #2a78d6;  /* 1 Core */
+  --s2: #eb6834;  /* 2 Core */
+  --s3: #1baf7a;  /* scaling */
+  --warn-bg: #fdf3dc;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255, 255, 255, 0.10);
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --warn-bg: #3a2f14;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --border: rgba(255, 255, 255, 0.10);
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --warn-bg: #3a2f14;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--page); color: var(--ink);
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+main { max-width: 1120px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 24px; margin: 0 0 4px; }
+h2 { font-size: 17px; margin: 0; }
+.sub { color: var(--ink-2); margin: 0; }
+.meta { display: flex; flex-wrap: wrap; gap: 4px 20px; color: var(--ink-2); font-size: 13px; margin: 12px 0 0; padding: 0; list-style: none; }
+.meta b { color: var(--ink); font-weight: 600; }
+.notice { background: var(--warn-bg); border-radius: 8px; padding: 10px 14px; margin: 16px 0 0; }
+.legend { display: flex; gap: 16px; align-items: center; margin: 24px 0 8px; color: var(--ink-2); }
+.key { display: inline-flex; align-items: center; gap: 6px; }
+.swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+section { margin-top: 32px; }
+section > header { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.hint { color: var(--muted); font-size: 13px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 12px; }
+.grid.runtimes { grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); }
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 12px 4px; }
+.panel h3 { font-size: 13px; font-weight: 600; margin: 0 0 4px; color: var(--ink-2); }
+svg { display: block; width: 100%; height: auto; overflow: visible; }
+svg text { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+svg .runtime { fill: var(--ink-2); font-size: 12px; }
+svg .value { fill: var(--ink-2); font-size: 11px; paint-order: stroke; stroke: var(--surface); stroke-width: 3px; }
+.foot { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
+#tip {
+  position: fixed; pointer-events: none; z-index: 10; display: none;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.12);
+  min-width: 160px;
+}
+#tip .t { font-weight: 600; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+#tip .r { display: flex; justify-content: space-between; gap: 16px; color: var(--ink-2); }
+#tip .r b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+#tip .w { color: var(--ink-2); margin-top: 4px; }
+details { margin-top: 40px; }
+summary { cursor: pointer; font-weight: 600; }
+.table-wrap { overflow-x: auto; margin-top: 12px; }
+table { border-collapse: collapse; font-size: 12px; width: 100%; background: var(--surface); }
+th, td { padding: 6px 8px; border-bottom: 1px solid var(--grid); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+th { color: var(--ink-2); font-weight: 600; }
+th:first-child, td:first-child, td.l { text-align: left; }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="title"></h1>
+  <p class="sub" id="subtitle"></p>
+  <ul class="meta" id="meta"></ul>
+  <div id="notices"></div>
+  <div class="legend" id="legend"></div>
+  <div id="charts"></div>
+  <details>
+    <summary>전체 수치 표</summary>
+    <div class="table-wrap"><table id="table"></table></div>
+  </details>
+</main>
+<div id="tip" role="tooltip"></div>
+<script>
+const D = /*DATA*/null;
+const rows = D.rows;
+const meta = D.meta || {};
+const sc = meta.scenario || {};
+
+const ORDER = ["node", "bun", "go", "rust"];
+const runtimes = [...new Set(rows.map(r => r.runtime))]
+  .sort((a, b) => (ORDER.indexOf(a) + 1 || 99) - (ORDER.indexOf(b) + 1 || 99) || a.localeCompare(b));
+const coreSet = [...new Set(rows.map(r => r.cores))].sort((a, b) => a - b);
+const color = c => `var(--s${coreSet.indexOf(c) + 1})`;
+const condKey = r => `${r.connections}|${r.payload_bytes}|${r.rate || 0}`;
+const conditions = [...new Map(rows.map(r => [condKey(r), r])).values()]
+  .sort((a, b) => a.connections - b.connections || a.payload_bytes - b.payload_bytes || (a.rate || 0) - (b.rate || 0));
+
+const nf = new Intl.NumberFormat("en-US");
+const fmt = (v, d = 0) => v == null ? "–" : nf.format(Number(v.toFixed(d)));
+const bytes = b => b >= 1024 ? `${b / 1024} KB` : `${b} B`;
+const condTitle = c => [`연결 ${nf.format(c.connections)}`, `payload ${bytes(c.payload_bytes)}`,
+  c.rate ? `목표 ${nf.format(c.rate)} msg/s` : null].filter(Boolean).join(" · ");
+const esc = s => String(s).replace(/[&<>"]/g, ch => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[ch]));
+const WARN = {
+  loader_saturated: "loader 포화: 실제 상한은 이보다 높을 수 있음",
+  rate_not_sustained: "목표 rate 미달",
+  message_errors: "message error 발생",
+};
+const warnText = w => WARN[w] || w;
+
+// Header
+document.getElementById("title").textContent = `${sc.name || D.session} 결과`;
+document.getElementById("subtitle").textContent =
+  `${D.session} · mode ${sc.mode || "?"} · 조건별 유효 회차의 median`;
+const host = meta.host || {}, dk = meta.docker || {};
+const metaItems = [
+  ["회차", sc.runs], ["warm-up / 측정", sc.warmup != null ? `${sc.warmup}s / ${sc.duration}s` : null],
+  ["pipeline", sc.mode === "throughput" ? sc.pipeline : null],
+  ["server CPU", (host.server_cpus || []).join(",")], ["loader CPU", host.loader_cpus],
+  ["host", dk.Architecture ? `${dk.OperatingSystem} · ${dk.Architecture} · ${dk.NCPU} CPU` : null],
+  ["시작", meta.started_at ? meta.started_at.replace("T", " ").slice(0, 19) + " UTC" : null],
+].filter(([, v]) => v != null && v !== "");
+document.getElementById("meta").innerHTML = metaItems.map(([k, v]) => `<li>${k} <b>${esc(v)}</b></li>`).join("");
+
+const notices = [];
+if (sc.name === "smoke") notices.push("smoke scenario는 파이프라인 점검용입니다. 회차가 짧아 수치 비교에 쓰면 안 됩니다.");
+if (rows.some(r => r.valid_runs < 2)) notices.push("회차가 1회뿐인 조건이 있습니다. 잡음이 크므로 방향만 참고하세요.");
+document.getElementById("notices").innerHTML = notices.map(n => `<p class="notice">${esc(n)}</p>`).join("");
+
+document.getElementById("legend").innerHTML = coreSet.map(c =>
+  `<span class="key"><span class="swatch" style="background:${color(c)}"></span>${c} Core</span>`).join("")
+  + (sc.mode === "room" ? `<span class="key"><span class="swatch" style="border:2px solid var(--ink-2);border-radius:50%;width:10px;height:10px"></span>SLO 실패한 단계</span>` : "");
+
+// Scales: a tick step of 1/2/2.5/5 x 10^n giving at most 5 intervals; the
+// axis ends on the first tick at or above the data.
+function scale(raw) {
+  if (!(raw > 0)) raw = 1;
+  const p = 10 ** Math.floor(Math.log10(raw));
+  const step = [0.1, 0.2, 0.25, 0.5, 1, 2, 2.5, 5].map(s => s * p).find(s => raw / s <= 5) || p;
+  const max = Math.ceil(raw / step - 1e-9) * step, ticks = [];
+  for (let t = 0; t <= max + 1e-9; t += step) ticks.push(+t.toFixed(10));
+  return {max, ticks};
+}
+const compact = v => v >= 1e6 ? `${+(v / 1e6).toFixed(1)}M` : v >= 1e3 ? `${+(v / 1e3).toFixed(1)}K` : `${+v.toFixed(2)}`;
+
+// A column with a 4px rounded data end, square at the baseline.
+function column(x, y, w, h) {
+  const r = Math.min(4, h, w / 2), b = y + h;
+  return `M${x},${b}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${b}Z`;
+}
+
+const W = 460, H = 220, M = {l: 48, r: 8, t: 18, b: 26};
+const tip = document.getElementById("tip");
+const marks = [];  // hover data, indexed by data-i
+
+function panelSvg(series, get, opts) {
+  // series: [{key, color}] per group; get(runtime, s) -> {value, row} | null
+  const vals = [];
+  for (const rt of runtimes) for (const s of series) { const v = get(rt, s); if (v && v.value != null) vals.push(v.value); }
+  const {max, ticks} = scale(Math.max(...vals, opts.ref || 0) * 1.08);
+  const y = v => M.t + (H - M.t - M.b) * (1 - v / max);
+  const band = (W - M.l - M.r) / runtimes.length;
+  const gap = 2, bw = Math.min(24, (band * 0.62 - gap * (series.length - 1)) / series.length);
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(opts.label)}">`;
+  for (const t of ticks) {
+    s += `<line x1="${M.l}" x2="${W - M.r}" y1="${y(t)}" y2="${y(t)}" stroke="var(--grid)" stroke-width="1"/>`;
+    s += `<text x="${M.l - 6}" y="${y(t) + 4}" text-anchor="end">${compact(t)}</text>`;
+  }
+  if (opts.ref) {
+    s += `<line x1="${M.l}" x2="${W - M.r}" y1="${y(opts.ref)}" y2="${y(opts.ref)}" stroke="var(--ink-2)" stroke-width="1" stroke-dasharray="4 3"/>`;
+  }
+  runtimes.forEach((rt, gi) => {
+    const gx = M.l + band * gi + band / 2, total = series.length * bw + gap * (series.length - 1);
+    series.forEach((ser, si) => {
+      const v = get(rt, ser);
+      const x = gx - total / 2 + si * (bw + gap);
+      if (!v) return;
+      if (v.value == null) {  // condition ran but no valid run
+        s += `<text x="${x + bw / 2}" y="${y(0) - 4}" text-anchor="middle">×</text>`;
+      } else {
+        const top = y(v.value);
+        s += `<path d="${column(x, top, bw, y(0) - top)}" fill="${ser.color}"/>`;
+        if (opts.labelValues) s += `<text class="value" x="${x + bw / 2}" y="${top - 5}" text-anchor="middle">${opts.fmt(v.value, v)}</text>`;
+        else if (opts.flag && opts.flag(v.row)) s += `<text class="value" x="${x + bw / 2}" y="${top - 5}" text-anchor="middle">≥</text>`;
+      }
+      marks.push({rt, ser, v, opts});
+      s += `<rect data-i="${marks.length - 1}" x="${x - 1}" y="${M.t}" width="${bw + 2}" height="${H - M.t - M.b}" fill="transparent"/>`;
+    });
+    s += `<text class="runtime" x="${gx}" y="${H - 6}" text-anchor="middle">${esc(rt)}</text>`;
+  });
+  s += `<line x1="${M.l}" x2="${W - M.r}" y1="${y(0)}" y2="${y(0)}" stroke="var(--axis)" stroke-width="1"/>`;
+  return s + "</svg>";
+}
+
+// Room mode: capacity per runtime, then one row of small multiples per metric
+// (a panel per runtime, a line per core count, a shared y scale across panels).
+function roomView() {
+  const cap = D.capacity || [];
+  const levels = [...new Set(rows.map(r => r.connections).concat(sc.connections || []))].sort((a, b) => a - b);
+  const room = sc.room_size ? `방당 ${sc.room_size}명 · 사용자당 ${sc.user_rate}회/s · SLO: 전달 p99 ≤ ${sc.slo_p99_ms} ms, 누락 0, 접속 실패 0` : "";
+  let out = `<p class="sub" style="margin-top:12px">${esc(room)}</p>`;
+
+  out += `<section><header><h2>최대 동시 사용자 수</h2><span class="hint">SLO를 지킨 가장 높은 단계 · 높을수록 좋음</span></header><div class="grid">`;
+  for (const payload of [...new Set(cap.map(c => c.payload_bytes))]) {
+    const svg = panelSvg(coreSeries, (rt, ser) => {
+      const c = cap.find(c => c.runtime === rt && c.cores === ser.key && c.payload_bytes === payload);
+      const row = c && rows.find(r => r.runtime === rt && r.cores === ser.key && r.payload_bytes === payload && r.connections === (c.max_users || levels[0]));
+      return c ? {value: c.max_users, row: row || {...c, median: {}, runs: 0, valid_runs: 0, connections: c.max_users}, cap: c} : null;
+    }, {label: "최대 동시 사용자 수", unit: "명", labelValues: true, metric: "최대 사용자",
+        fmt: (n, v) => (v && v.cap && v.cap.failed_at == null ? "≥" : "") + compact(n)});
+    out += `<div class="panel"><h3>body ${bytes(payload)}</h3>${svg}</div>`;
+  }
+  out += `</div><p class="foot">사용자 수 단계: ${levels.map(compact).join(", ")}. 첫 단계부터 실패하면 0입니다.`
+    + (cap.some(c => c.loader_limited) ? " 일부 실패는 loader가 포화된 상태에서 일어나 서버 한계가 아닐 수 있습니다 (표의 warnings 참고)." : "")
+    + (cap.some(c => c.failed_at == null) ? " 모든 단계를 통과한 조합은 실제 한계가 더 높습니다." : "") + `</p></section>`;
+
+  const LINES = [
+    {title: "전달 latency p99", unit: "ms", hint: "보낸 시각부터 같은 방 사용자가 받기까지 · 점선이 SLO", get: r => r.median.p99, d: 1, ref: sc.slo_p99_ms},
+    {title: "서버 CPU", unit: "cores", hint: "실제 사용한 코어 수", get: r => r.median.cores, d: 2},
+    {title: "서버 memory", unit: "MB", hint: "평균, page cache 제외", get: r => r.median["mem MB"], d: 1},
+    {title: "초당 전달 수", unit: "msg/s", hint: "loader가 받은 broadcast 수", get: r => r.median["msg/s"], d: 0},
+  ];
+  for (const m of LINES) {
+    if (!rows.some(r => m.get(r) != null)) continue;
+    const vals = rows.map(m.get).filter(v => v != null);
+    const sc_ = scale(Math.max(...vals, m.ref || 0) * 1.08);
+    out += `<section><header><h2>${m.title}</h2><span class="hint">${esc(m.unit)} · ${esc(m.hint)}</span></header><div class="grid runtimes">`;
+    for (const rt of runtimes) {
+      out += `<div class="panel"><h3>${esc(rt)}</h3>${lineSvg(rt, levels, m, sc_)}</div>`;
+    }
+    out += `</div></section>`;
+  }
+  return out;
+}
+
+function lineSvg(rt, levels, m, {max, ticks}) {
+  const L = {l: 48, r: 14, t: 14, b: 26};
+  const y = v => L.t + (H - L.t - L.b) * (1 - v / max);
+  const x = i => L.l + (levels.length < 2 ? (W - L.l - L.r) / 2 : (W - L.l - L.r) * i / (levels.length - 1));
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(`${m.title} ${rt}`)}">`;
+  for (const t of ticks) {
+    s += `<line x1="${L.l}" x2="${W - L.r}" y1="${y(t)}" y2="${y(t)}" stroke="var(--grid)" stroke-width="1"/>`;
+    s += `<text x="${L.l - 6}" y="${y(t) + 4}" text-anchor="end">${compact(t)}</text>`;
+  }
+  if (m.ref) s += `<line x1="${L.l}" x2="${W - L.r}" y1="${y(m.ref)}" y2="${y(m.ref)}" stroke="var(--ink-2)" stroke-width="1" stroke-dasharray="4 3"/>`;
+  s += `<line x1="${L.l}" x2="${W - L.r}" y1="${y(0)}" y2="${y(0)}" stroke="var(--axis)" stroke-width="1"/>`;
+  levels.forEach((lv, i) => { s += `<text x="${x(i)}" y="${H - 6}" text-anchor="middle">${compact(lv)}</text>`; });
+  for (const c of coreSet) {
+    const pts = levels.map((lv, i) => {
+      const r = rows.find(r => r.runtime === rt && r.cores === c && r.connections === lv);
+      const v = r && m.get(r);
+      return v == null ? null : {i, v, r};
+    }).filter(Boolean);
+    if (pts.length > 1) s += `<polyline points="${pts.map(p => `${x(p.i)},${y(Math.min(p.v, max))}`).join(" ")}" fill="none" stroke="${color(c)}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    for (const p of pts) {
+      const ok = p.r.slo_pass !== false;
+      s += `<circle cx="${x(p.i)}" cy="${y(Math.min(p.v, max))}" r="4.5" fill="${ok ? color(c) : "var(--surface)"}" stroke="${ok ? "var(--surface)" : color(c)}" stroke-width="2"/>`;
+      marks.push({rt, ser: {color: color(c)}, v: {value: p.v, row: p.r}, opts: {metric: m.title, unit: m.unit, fmt: v => fmt(v, m.d), room: true}});
+      s += `<circle data-i="${marks.length - 1}" cx="${x(p.i)}" cy="${y(Math.min(p.v, max))}" r="11" fill="transparent"/>`;
+    }
+  }
+  return s + "</svg>";
+}
+
+const find = (cond, rt, cores) => rows.find(r => condKey(r) === condKey(cond) && r.runtime === rt && r.cores === cores);
+const saturated = r => (r.warnings || []).includes("loader_saturated");
+
+const METRICS = [
+  {title: "처리량", unit: "msg/s", hint: "높을수록 좋음", get: r => r.median["msg/s"], d: 0, flag: saturated},
+  {title: "코어당 처리량", unit: "msg/s ÷ 실제 사용 코어", hint: "높을수록 효율적", get: r => r.msg_per_sec_per_core, d: 0, flag: saturated},
+  {title: "p99 latency", unit: "ms", hint: "낮을수록 좋음", get: r => r.median.p99, d: 2},
+  {title: "p50 latency", unit: "ms", hint: "낮을수록 좋음", get: r => r.median.p50, d: 2},
+  {title: "평균 memory", unit: "MB, page cache 제외", hint: "낮을수록 좋음", get: r => r.median["mem MB"], d: 1},
+  {title: "연결당 memory", unit: "KB", hint: "낮을수록 좋음", get: r => r.median["KB/conn"], d: 1},
+];
+const coreSeries = coreSet.map(c => ({key: c, color: color(c), label: `${c} Core`}));
+
+let html = sc.mode === "room" ? roomView() : "";
+for (const m of sc.mode === "room" ? [] : METRICS) {
+  if (!rows.some(r => m.get(r) != null)) continue;
+  const anyFlag = m.flag && rows.some(m.flag);
+  html += `<section><header><h2>${m.title}</h2><span class="hint">${esc(m.unit)} · ${m.hint}</span></header><div class="grid">`;
+  for (const c of conditions) {
+    const svg = panelSvg(coreSeries, (rt, ser) => {
+      const r = find(c, rt, ser.key);
+      return r ? {value: m.get(r), row: r} : null;
+    }, {label: `${m.title} ${condTitle(c)}`, unit: m.unit, fmt: v => fmt(v, m.d), flag: m.flag, metric: m.title});
+    html += `<div class="panel"><h3>${condTitle(c)}</h3>${svg}</div>`;
+  }
+  html += `</div>`;
+  if (anyFlag) html += `<p class="foot">≥ 표시: loader가 포화된 조건입니다. 서버가 아니라 loader 한계일 수 있어 실제 상한은 더 높을 수 있습니다.</p>`;
+  html += `</section>`;
+}
+
+// Scaling: one series, the 2c/1c ratio against the ideal line.
+if (sc.mode !== "room" && rows.some(r => r.scaling_ratio != null)) {
+  const top = Math.max(...coreSet);
+  html += `<section><header><h2>Scaling (${top} Core ÷ 1 Core 처리량)</h2><span class="hint">점선: 이상적인 선형 증가 (${top}.0x)</span></header><div class="grid">`;
+  for (const c of conditions) {
+    const svg = panelSvg([{key: top, color: "var(--s3)", label: "scaling"}], (rt) => {
+      const r = find(c, rt, top);
+      return r ? {value: r.scaling_ratio, row: r} : null;
+    }, {label: `scaling ${condTitle(c)}`, unit: "x", fmt: v => `${v.toFixed(2)}x`, labelValues: true,
+        ref: top, metric: "scaling"});
+    html += `<div class="panel"><h3>${condTitle(c)}</h3>${svg}</div>`;
+  }
+  html += `</div><p class="foot">loader가 포화된 조건의 scaling은 과소평가일 수 있습니다. 표의 warnings를 함께 보세요.</p></section>`;
+}
+document.getElementById("charts").innerHTML = html;
+
+// Tooltip
+document.addEventListener("pointermove", e => {
+  const i = e.target.dataset && e.target.dataset.i;
+  if (i == null) { tip.style.display = "none"; return; }
+  const {rt, ser, v, opts} = marks[i], r = v.row, impl = (meta.implementations || {})[rt];
+  const lines = [
+    [opts.metric, v.value == null ? "유효 회차 없음" : opts.fmt(v.value) + (opts.unit === "x" || opts.unit === "명" ? "" : ` ${opts.unit.split(",")[0]}`)],
+    ...(opts.room ? [["사용자", nf.format(r.connections)], ["SLO 통과", `${r.slo_passed_runs}/${r.runs}`],
+      ["전달 p99", `${fmt(r.median.p99, 1)} ms`]] : []),
+    ["유효 회차", `${r.valid_runs}/${r.runs}`],
+    ["사용 코어", fmt(r.median.cores, 2)],
+  ];
+  tip.innerHTML = `<div class="t"><span class="swatch" style="background:${ser.color}"></span>${esc(rt)} · ${r.cores} Core</div>`
+    + (impl ? `<div class="r" style="margin-bottom:4px">${esc(impl)}</div>` : "")
+    + lines.map(([k, val]) => `<div class="r">${esc(k)}<b>${esc(val)}</b></div>`).join("")
+    + (r.warnings || []).map(w => `<div class="w">⚠ ${esc(warnText(w))}</div>`).join("");
+  tip.style.display = "block";
+  const tw = tip.offsetWidth, th = tip.offsetHeight;
+  tip.style.left = `${Math.min(e.clientX + 14, innerWidth - tw - 8)}px`;
+  tip.style.top = `${e.clientY + 14 + th > innerHeight ? e.clientY - th - 10 : e.clientY + 14}px`;
+});
+
+// Table view
+const cols = [
+  ["runtime", r => r.runtime, "l"], ["cores", r => r.cores], ["conns", r => nf.format(r.connections)],
+  ["payload", r => bytes(r.payload_bytes)], ["rate", r => r.rate ? nf.format(r.rate) : "–"],
+  ["msg/s", r => fmt(r.median["msg/s"])], ["p50 ms", r => fmt(r.median.p50, 3)], ["p95 ms", r => fmt(r.median.p95, 3)],
+  ["p99 ms", r => fmt(r.median.p99, 3)], ["코어 사용", r => fmt(r.median.cores, 3)], ["mem MB", r => fmt(r.median["mem MB"], 2)],
+  ["peak MB", r => fmt(r.median["peak MB"], 2)], ["KB/conn", r => fmt(r.median["KB/conn"], 1)],
+  ["msg/s/core", r => fmt(r.msg_per_sec_per_core)],
+  ["scaling", r => r.scaling_ratio != null ? `${r.scaling_ratio.toFixed(2)}x (${Math.round(r.scaling_efficiency * 100)}%)` : "–"],
+  ["runs", r => `${r.valid_runs}/${r.runs}`],
+  ...(rows.some(r => r.slo_passed_runs != null) ? [["SLO 통과", r => `${r.slo_passed_runs}/${r.runs}`]] : []),
+  ["warnings", r => (r.warnings || []).join(", ") || "–", "l"],
+];
+const sorted = [...rows].sort((a, b) => condKey(a).localeCompare(condKey(b), "en", {numeric: true})
+  || runtimes.indexOf(a.runtime) - runtimes.indexOf(b.runtime) || a.cores - b.cores);
+document.getElementById("table").innerHTML =
+  `<thead><tr>${cols.map(([h]) => `<th>${h}</th>`).join("")}</tr></thead><tbody>`
+  + sorted.map(r => `<tr>${cols.map(([, f, cls]) => `<td${cls ? ` class="${cls}"` : ""}>${esc(f(r))}</td>`).join("")}</tr>`).join("")
+  + "</tbody>";
+</script>
+</body>
+</html>

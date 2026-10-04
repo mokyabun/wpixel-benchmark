@@ -1,0 +1,16 @@
+{
+  "name": "room-capacity",
+  "mode": "room",
+  "servers": ["node", "bun", "go", "rust"],
+  "cores": [1, 2],
+  "connections": [1000, 2000, 5000, 10000, 20000, 40000],
+  "payload": [64],
+  "room_size": 20,
+  "user_rate": 0.2,
+  "slo_p99_ms": 100,
+  "warmup": 15,
+  "duration": 30,
+  "stabilize": 3,
+  "cooldown": 10,
+  "runs": 3
+}
